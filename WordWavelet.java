@@ -2,26 +2,17 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Scanner;
 
 public class WordWavelet{
 	public static void main(String[] args) throws Exception{
+		if(args.length < 1){
+			System.out.println("Requires file name when run");
+			System.exit(1);
+		}
 
-		// CompressedTrie t = new CompressedTrie();
-
-		// Scanner scan = new Scanner(new File(args[0]));
-		// String s;
-		// while(scan.hasNext()){
-		// 	s = scan.next();
-		// 	t.addWord(s);
-		// }
-		// System.out.println(t.numWords);
-		// t.printTrie();
 		try{
 			WaveletTree root = new WaveletTree(args[0]);
 			root.save();
@@ -33,11 +24,7 @@ public class WordWavelet{
 			System.out.println("File not found: " + args[0]);
 			System.exit(1);
 		}
-		// catch(NullPointerException e){
-		// 	System.out.println("File name not given");
-		// 	e.printStackTrace();
-		// 	System.exit(2);
-		// }
+
 		catch (IOException e){
 			System.out.println("Output error");
 			System.exit(2);		
@@ -70,7 +57,7 @@ class WaveletTree{
 			list.addWord(n);
 		}
 		scan.close();
-
+		//list.printTrie();
 		this.root = new WaveletTreeNode(list, filename);
 		this.numBits = this.root.numBits;
 	}
@@ -117,7 +104,7 @@ class WaveletTree{
 			return;
 		}
 		fp.write(root.numBits+"");
-		for(int i = 0; i < root.numBits / (Integer.BYTES * 8) + 1; i++){
+		for(int i = 0; i < root.numBits / (Character.BYTES * 8) + 1; i++){
 			fp.write(" " + root.bits[i]);
 		}
 		fp.write("\n");
@@ -166,7 +153,7 @@ class WaveletTree{
 	// }
 
 	static class WaveletTreeNode{
-		int[] bits;
+		char[] bits;
 		int numBits;
 		WaveletTreeNode left,right;
 
@@ -178,28 +165,28 @@ class WaveletTree{
 			if(low >= high){
 				throw new NullPointerException();
 			}
-			this.bits = new int[10];
+			this.bits = new char[100];
 			this.numBits = 0;
 			int mid = (low + high) / 2;
-			int bitshift=Integer.BYTES * 8 - 1, bytes=0;
+			int bitshift=Character.BYTES * 8 - 1, bytes=0;
 			Scanner scan = new Scanner(new File(filename));
 			
 			String lowS = list.getNthString(low);
 			String midS = list.getNthString(mid);
 			String highS = list.getNthString(high);
-
+			System.out.printf("%d %s %d %s %d %s\n", low, lowS, mid, midS, high, highS);
 			while(scan.hasNext()){
 				String s = scan.next();
 				// check if word is in allowed range
 				if(s.compareTo(highS)<=0 && s.compareTo(lowS) >= 0){
 					if((s.compareTo(midS)) > 0){
-						this.bits[bytes] += 1<<bitshift;
+						this.bits[bytes] += 1 << bitshift;
 					}
 					this.numBits++;
 					bitshift--;
 					if(bitshift < 0){
 						bytes++;
-						bitshift = Integer.BYTES * 8 - 1;
+						bitshift = Character.BYTES * 8 - 1;
 					}
 					if(bytes >= this.bits.length){
 						this.bits = Arrays.copyOf(this.bits, this.bits.length*2);
@@ -207,7 +194,7 @@ class WaveletTree{
 				}
 
 			}
-			//printBitVector();
+			printBitVector();
 			scan.close();
 			try{
 				this.left = new WaveletTreeNode(list, filename, low, mid);
@@ -233,9 +220,9 @@ class WaveletTree{
 
 			if(s2.hasNext()){
 				numBits = s2.nextInt();
-				bits = new int[numBits / (Integer.BYTES * 8) + 1];
+				bits = new char[numBits / (Character.BYTES * 8) + 1];
 				for(int i = 0; i < bits.length; i++){
-					bits[i] = s2.nextInt();
+					//bits[i] = s2.next();
 
 				}
 				s2.close();
@@ -261,10 +248,9 @@ class WaveletTree{
 
 		public void printBitVector(){
 			int bytes = 0;
-			int bitshift = Integer.BYTES * 8 - 1;
-			System.out.println(this.numBits);
+			int bitshift = Character.BYTES * 8 - 1;
 			for(int i = 0; i < this.numBits; i++){
-				System.out.print(Integer.remainderUnsigned(bits[bytes] >> bitshift, 2));
+				System.out.print((bits[bytes] >> bitshift) % 2);
 				bitshift--;
 				if(bitshift < 0){
 					bytes++;
@@ -315,7 +301,6 @@ class CompressedTrie{
 
 	private void printTrieHelper(CompressedTrieNode n, String s){
 		s = s.concat(n.string);
-		System.out.println(n.numWords + " " + n.string);
 		if(n.isWord){
 			System.out.println(s);
 		}
@@ -349,11 +334,11 @@ class CompressedTrie{
 		CompressedTrieNode node = root;
 
 		int i = 0, j;
-		while(i < n){
+		while(i <= n){
 
 			for(j = 0; j < node.suffix.length; j++){
 				if (node.suffix[j] != null){
-					if(i + node.suffix[j].numWords > n){
+					if(i + node.suffix[j].numWords >= n){
 						node = node.suffix[j];
 						s = s.concat(node.string);
 						break;

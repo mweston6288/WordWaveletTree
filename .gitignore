@@ -2,3 +2,4 @@
 *.c
 *.class
 *.out
+.vscode/launch.json
