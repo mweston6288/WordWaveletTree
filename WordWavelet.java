@@ -5,9 +5,14 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Scanner;
-
+import java.nio.charset.*;
 public class WordWavelet{
 	public static void main(String[] args) throws Exception{
+		FileWriter fp = new FileWriter(new File("save.txt"));
+		char c = 65535;		
+		fp.write(c);
+		fp.close();
+		System.exit(0);
 		if(args.length < 1){
 			System.out.println("Requires file name when run");
 			System.exit(1);
@@ -16,7 +21,7 @@ public class WordWavelet{
 		try{
 			WaveletTree root = new WaveletTree(args[0]);
 			root.save();
-			//root.restore();	
+			root.restore();	
 			// WaveletTree root = WaveletTree.build("save.txt");
 			// root.restore();
 		}
@@ -57,7 +62,7 @@ class WaveletTree{
 			list.addWord(n);
 		}
 		scan.close();
-		//list.printTrie();
+		list.printTrie();
 		this.root = new WaveletTreeNode(list, filename);
 		this.numBits = this.root.numBits;
 	}
@@ -87,9 +92,8 @@ class WaveletTree{
 
 
 	public void save() throws IOException{
-		FileWriter fp = new FileWriter("save.txt");
-
-		fp.write(this.list.numWords + "\n");
+		FileWriter fp = new FileWriter(new File("save.txt"), StandardCharsets.US_ASCII);
+		//fp.write(this.list.numWords + "\n");
 
 		list.writeToFile(fp);
 
@@ -103,9 +107,9 @@ class WaveletTree{
 			fp.write("\n");
 			return;
 		}
-		fp.write(root.numBits+"");
-		for(int i = 0; i < root.numBits / (Character.BYTES * 8) + 1; i++){
-			fp.write(" " + root.bits[i]);
+		fp.write(root.numBits+" ");
+		for(int i = 0; i < root.numBits / 8; i++){
+			fp.write(root.bits[i]);
 		}
 		fp.write("\n");
 		writeVectors(fp, root.left);
@@ -113,47 +117,48 @@ class WaveletTree{
 
 	}
 	// TODO: add Compressed Trie version
-	// public void restore()throws IOException{
-	// 	FileWriter fp = new FileWriter("res.txt");
-	// 	for(int i = 0; i < this.numBits; i++){
-	// 		restoreHelper(fp, this.root, 0, this.list.size() - 1, i);
-	// 	}
-	// 	fp.close();
-	// }
+	public void restore()throws IOException{
+		FileWriter fp = new FileWriter("res.txt");
+		for(int i = 0; i < this.numBits; i++){
+			restoreHelper(fp, this.root, 1, this.list.numWords, i);
+		}
+		fp.close();
+	}
 
-	// private void restoreHelper(FileWriter fp, WaveletTreeNode root, int low, int high, int bitCount)throws IOException{
-	// 	if(low >= high){
-	// 		fp.write(this.list.get(low) + " ");
-	// 		return;
-	// 	}
-	// 	int bitshift = Integer.BYTES * 8 - 1;
-	// 	int bytes = 0;
-	// 	int one = 0;
-	// 	int zero = 0;
-	// 	for(int i = 0; i < bitCount; i++){
-	// 		if(Integer.remainderUnsigned(root.bits[bytes] >> bitshift, 2) == 1){
-	// 			one++;
-	// 		}
-	// 		else{
-	// 			zero++;
-	// 		}
-	// 		bitshift--;
-	// 		if (bitshift < 0){
-	// 			bytes++;
-	// 			bitshift = Integer.BYTES * 8 - 1;
-	// 		}
+	private void restoreHelper(FileWriter fp, WaveletTreeNode root, int low, int high, int bitCount)throws IOException{
+		System.out.println(low + " " + high);
+		if(low >= high){
+			fp.write(this.list.getNthString(low) + " ");
+			return;
+		}
+		int bitshift = 7;
+		int bytes = 0;
+		int one = 0;
+		int zero = 0;
+		for(int i = 0; i < bitCount; i++){
+			if((root.bits[bytes] >>> bitshift) % 2 == 1){
+				one++;
+			}
+			else{
+				zero++;
+			}
+			bitshift--;
+			if (bitshift < 0){
+				bytes++;
+				bitshift = 7;
+			}
 
-	// 	}
-	// 	if(Integer.remainderUnsigned(root.bits[bytes] >> bitshift, 2) == 1){
-	// 		restoreHelper(fp, root.right, (low+high) / 2 + 1, high, one);
-	// 	}
-	// 	else{
-	// 		restoreHelper(fp, root.left, low, (low+high) / 2 , zero);
-	// 	}
-	// }
+		}
+		if((root.bits[bytes] >>> bitshift) % 2 == 1){
+			restoreHelper(fp, root.right, (low+high) / 2 + 1, high, one);
+		}
+		else{
+			restoreHelper(fp, root.left, low, (low+high) / 2 , zero);
+		}
+	}
 
 	static class WaveletTreeNode{
-		char[] bits;
+		byte[] bits;
 		int numBits;
 		WaveletTreeNode left,right;
 
@@ -165,16 +170,15 @@ class WaveletTree{
 			if(low >= high){
 				throw new NullPointerException();
 			}
-			this.bits = new char[100];
+			this.bits = new byte[100];
 			this.numBits = 0;
 			int mid = (low + high) / 2;
-			int bitshift=Character.BYTES * 8 - 1, bytes=0;
+			int bitshift = 7, bytes=0;
 			Scanner scan = new Scanner(new File(filename));
 			
 			String lowS = list.getNthString(low);
 			String midS = list.getNthString(mid);
 			String highS = list.getNthString(high);
-			System.out.printf("%d %s %d %s %d %s\n", low, lowS, mid, midS, high, highS);
 			while(scan.hasNext()){
 				String s = scan.next();
 				// check if word is in allowed range
@@ -186,7 +190,7 @@ class WaveletTree{
 					bitshift--;
 					if(bitshift < 0){
 						bytes++;
-						bitshift = Character.BYTES * 8 - 1;
+						bitshift = 7;
 					}
 					if(bytes >= this.bits.length){
 						this.bits = Arrays.copyOf(this.bits, this.bits.length*2);
@@ -220,7 +224,7 @@ class WaveletTree{
 
 			if(s2.hasNext()){
 				numBits = s2.nextInt();
-				bits = new char[numBits / (Character.BYTES * 8) + 1];
+				bits = new byte[numBits / 8 + 1];
 				for(int i = 0; i < bits.length; i++){
 					//bits[i] = s2.next();
 
@@ -248,13 +252,13 @@ class WaveletTree{
 
 		public void printBitVector(){
 			int bytes = 0;
-			int bitshift = Character.BYTES * 8 - 1;
+			int bitshift = 7;
 			for(int i = 0; i < this.numBits; i++){
-				System.out.print((bits[bytes] >> bitshift) % 2);
+				System.out.print((bits[bytes] >>> bitshift) % 2);
 				bitshift--;
 				if(bitshift < 0){
 					bytes++;
-					bitshift=Integer.BYTES * 8 - 1;
+					bitshift=7;
 
 				}
 			}
@@ -322,7 +326,11 @@ class CompressedTrie{
 		if(n == null){
 			return;
 		}
-		fp.write(n.string + "\n");
+		char c,d;
+		for(int i = 0; i < n.string.length(); i++){
+			//d = Character.  n.string.charAt(i) - 'a' + 1;
+		}
+		fp.write(n.string +" " + (n.isWord ? "1" : "0") +"\n");
 		for(int i = 0; i < n.suffix.length; i++){
 			writeToFileHelper(fp, n.suffix[i]);
 		}
